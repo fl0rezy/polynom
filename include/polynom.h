@@ -458,15 +458,17 @@ public:
         }
 
         polinom res;
-
+        auto last = res.monoms.before_begin();
         for (const monom& m1 : monoms) {
             for (const monom& m2 : other.monoms) {
                 monom m3 = m1 * m2;
+                if (m3.coef == 0.0) {
+                    continue;
+                }
 
-                if (m3.coef == 0.0) continue;
-
-                auto prev = res.monoms.before_begin();
-                auto curr = res.monoms.begin();
+                auto prev = last;
+                auto curr = last;
+                ++curr;
 
                 while (curr != res.monoms.end() && curr->degree > m3.degree) {
                     prev = curr;
@@ -475,13 +477,15 @@ public:
 
                 if (curr != res.monoms.end() && curr->degree == m3.degree) {
                     curr->coef += m3.coef;
-                    if (curr->coef == 0.0) { 
+                    if (curr->coef == 0.0) {
                         res.monoms.erase_after(prev);
                     }
                 }
                 else {
                     res.monoms.insert_after(prev, m3);
                 }
+
+                last = prev;
             }
         }
 
