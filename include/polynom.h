@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 #include <string>
 #include <forward_list>
@@ -388,17 +389,17 @@ public:
 
         while (it1 != monoms.end() && it2 != other.monoms.end()) {
             if (it1->degree > it2->degree) {
-                result.insertSorted(*it1);
+                result.monoms.push_front(*it1);
                 ++it1;
             }
             else if (it1->degree < it2->degree) {
-                result.insertSorted(monom(it2->degree, -it2->coef));
+                result.monoms.push_front(monom(it2->degree, -it2->coef));
                 ++it2;
             }
             else {
                 double diff = it1->coef - it2->coef;
                 if (diff != 0.0) {
-                    result.insertSorted(monom(it1->degree, diff));
+                    result.monoms.push_front(monom(it1->degree, diff));
                 }
                 ++it1;
                 ++it2;
@@ -406,15 +407,16 @@ public:
         }
 
         while (it1 != monoms.end()) {
-            result.insertSorted(*it1);
+            result.monoms.push_front(*it1);
             ++it1;
         }
 
         while (it2 != other.monoms.end()) {
-            result.insertSorted(monom(it2->degree, -it2->coef));
+            result.monoms.push_front(monom(it2->degree, -it2->coef));
             ++it2;
         }
 
+        result.monoms.reverse();
         return result;
     }
 
