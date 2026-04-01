@@ -2,6 +2,9 @@
 #include "polynom.h"
 #include "unordered_table.h"
 #include "ordered_table.h"
+#include "AVLTree.h"
+#include "BinTree.h"
+#include "rb_tree.h"
 
 TEST(polynom, constr)
 {
@@ -78,6 +81,11 @@ TEST(polynom, div_const)
 }
 
 
+
+
+
+
+
 TEST(ordered_table, empty_size) {
     ordered_table t;
     EXPECT_TRUE(t.empty());
@@ -151,6 +159,10 @@ TEST(ordered_table, clear) {
     EXPECT_TRUE(t.find("a") == t.end());
 }
 
+
+
+
+
 TEST(unordered_table, empty_size) {
     unordered_table t;
     EXPECT_TRUE(t.empty());
@@ -222,4 +234,209 @@ TEST(unordered_table, clear) {
     EXPECT_EQ(t.size(), 0);
     EXPECT_TRUE(t.begin() == t.end());
     EXPECT_TRUE(t.find("a") == t.end());
+}
+
+
+
+
+
+TEST(bst, empty_bst) {
+    BinTree t;
+    EXPECT_TRUE(t.empty());
+    EXPECT_TRUE(t.begin() == t.end());
+}
+
+TEST(bst, insert_) {
+    BinTree t;
+    ASSERT_NO_THROW(t.insert("a", polinom("x+2")));
+    EXPECT_FALSE(t.empty());
+    EXPECT_TRUE(t.find("a") != nullptr);
+    EXPECT_TRUE(t.find("b") == nullptr);
+}
+
+TEST(bst, insert_many) {
+    BinTree t;
+    t.insert("b", polinom("x"));
+    t.insert("a", polinom("2x^3+1"));
+    t.insert("c", polinom("4x^9"));
+    EXPECT_TRUE(t.find("a") != nullptr);
+    EXPECT_TRUE(t.find("b") != nullptr);
+    EXPECT_TRUE(t.find("c") != nullptr);
+}
+
+TEST(bst, insert_dupli) {
+    BinTree t;
+    t.insert("k", polinom("x+2"));
+    t.insert("k", polinom("2x^3+1"));
+    polinom* p = t.find("k");
+    EXPECT_EQ(*p, polinom("2x^3+1"));
+}
+
+TEST(bst, erase_) {
+    BinTree t;
+    t.insert("a", polinom("x"));
+    t.insert("b", polinom("x+2"));
+    t.insert("c", polinom("2x^3+1"));
+    t.remove("b");
+    EXPECT_TRUE(t.find("b") == nullptr);
+    EXPECT_TRUE(t.find("a") != nullptr);
+    EXPECT_TRUE(t.find("c") != nullptr);
+}
+
+TEST(bst, erase_2) {
+    BinTree t;
+    t.insert("a", polinom("x"));
+    t.insert("b", polinom("x+2"));
+    ASSERT_NO_THROW(t.remove("nope"));
+    EXPECT_TRUE(t.find("a") != nullptr);
+    EXPECT_TRUE(t.find("b") != nullptr);
+}
+
+TEST(bst, stress) {
+    BinTree t;
+    for (int i = 0; i < 100000; i++) {
+        t.insert(to_string(i), polinom("x"));
+    }
+    for (int i = 0; i < 10000; i += 2) {
+        t.remove(to_string(i));
+    }
+    EXPECT_TRUE(t.find("9999") != nullptr);
+    EXPECT_TRUE(t.find("0") == nullptr);
+}
+
+
+
+
+
+
+TEST(avl, empty_) {
+    AVLTree t;
+    EXPECT_TRUE(t.empty());
+    EXPECT_TRUE(t.begin() == t.end());
+}
+
+TEST(avl, insert_) {
+    AVLTree t;
+    ASSERT_NO_THROW(t.insert("a", polinom("x+2")));
+    EXPECT_FALSE(t.empty());
+    EXPECT_TRUE(t.find("a") != nullptr);
+    EXPECT_TRUE(t.find("b") == nullptr);
+}
+
+TEST(avl, insert_many) {
+    AVLTree t;
+    t.insert("b", polinom("x"));
+    t.insert("a", polinom("2x^3+1"));
+    t.insert("c", polinom("4x^9"));
+    EXPECT_TRUE(t.find("a") != nullptr);
+    EXPECT_TRUE(t.find("b") != nullptr);
+    EXPECT_TRUE(t.find("c") != nullptr);
+}
+
+TEST(avl, insert_dupli) {
+    AVLTree t;
+    t.insert("k", polinom("x+2"));
+    t.insert("k", polinom("2x^3+1"));
+    polinom* p = t.find("k");
+    EXPECT_EQ(*p, polinom("2x^3+1"));
+}
+
+TEST(avl, erase_) {
+    AVLTree t;
+    t.insert("a", polinom("x"));
+    t.insert("b", polinom("x+2"));
+    t.insert("c", polinom("2x^3+1"));
+    t.remove("b");
+    EXPECT_TRUE(t.find("b") == nullptr);
+    EXPECT_TRUE(t.find("a") != nullptr);
+    EXPECT_TRUE(t.find("c") != nullptr);
+}
+
+TEST(avl, erase_2) {
+    AVLTree t;
+    t.insert("a", polinom("x"));
+    t.insert("b", polinom("x+2"));
+    ASSERT_NO_THROW(t.remove("nope"));
+    EXPECT_TRUE(t.find("a") != nullptr);
+    EXPECT_TRUE(t.find("b") != nullptr);
+}
+
+TEST(avl, stress) {
+    AVLTree t;
+    for (int i = 0; i < 100000; i++) {
+        t.insert(to_string(i), polinom("x"));
+    }
+    for (int i = 0; i < 10000; i += 2) {
+        t.remove(to_string(i));
+    }
+    EXPECT_TRUE(t.find("9999") != nullptr);
+    EXPECT_TRUE(t.find("0") == nullptr);
+}
+
+
+
+
+
+TEST(rb, empty_) {
+    rb_tree<string, polinom> t;
+    EXPECT_TRUE(t.empty());
+    EXPECT_TRUE(t.begin() == t.end());
+}
+
+TEST(rb, insert_) {
+    rb_tree<string, polinom> t;
+    ASSERT_NO_THROW(t.insert("a", polinom("x+2")));
+    EXPECT_FALSE(t.empty());
+    EXPECT_TRUE(t.find("a") != t.end());
+    EXPECT_TRUE(t.find("b") == t.end());
+}
+
+TEST(rb, insert_many) {
+    rb_tree<string, polinom> t;
+    t.insert("b", polinom("x"));
+    t.insert("a", polinom("2x^3+1"));
+    t.insert("c", polinom("4x^9"));
+    EXPECT_TRUE(t.find("a") != t.end());
+    EXPECT_TRUE(t.find("b") != t.end());
+    EXPECT_TRUE(t.find("c") != t.end());
+}
+
+TEST(rb, insert_dupli) {
+    rb_tree<string, polinom> t;
+    t.insert("k", polinom("x+2"));
+    t.insert("k", polinom("2x^3+1"));
+    EXPECT_EQ(t.size(), 1);
+    EXPECT_TRUE(t.find("k") != t.end());
+}
+
+TEST(rb, erase_) {
+    rb_tree<string, polinom> t;
+    t.insert("a", polinom("x"));
+    t.insert("b", polinom("x+2"));
+    t.insert("c", polinom("2x^3+1"));
+    t.erase("b");
+    EXPECT_TRUE(t.find("b") == t.end());
+    EXPECT_TRUE(t.find("a") != t.end());
+    EXPECT_TRUE(t.find("c") != t.end());
+}
+
+TEST(rb, erase_2) {
+    rb_tree<string, polinom> t;
+    t.insert("a", polinom("x"));
+    t.insert("b", polinom("x+2"));
+    ASSERT_NO_THROW(t.erase("nope"));
+    EXPECT_TRUE(t.find("a") != t.end());
+    EXPECT_TRUE(t.find("b") != t.end());
+}
+
+TEST(rb, stress) {
+    rb_tree<string, polinom> t;
+    for (int i = 0; i < 100000; i++) {
+        t.insert(to_string(i), polinom("x"));
+    }
+    for (int i = 0; i < 10000; i += 2) {
+        t.erase(to_string(i));
+    }
+    EXPECT_TRUE(t.find("9999") != t.end());
+    EXPECT_TRUE(t.find("0") == t.end());
 }
