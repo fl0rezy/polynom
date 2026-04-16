@@ -6,6 +6,7 @@
 #include "BinTree.h"
 #include "rb_tree.h"
 #include "hash_table.h"
+#include "hash_table_chained.h"
 
 TEST(polynom, constr)
 {
@@ -568,12 +569,18 @@ TEST(hash, clear_) {
 
 TEST(hash, stress) {
     HashTable t;
-    for (int i = 0; i < 10000; i++) {
+    const int N = 4000000;
+
+    for (int i = 0; i < N; i++) {
         t.insert(to_string(i), polinom("x"));
     }
-    for (int i = 0; i < 10000; i += 2) {
+
+    EXPECT_TRUE(t.find("9999") != nullptr);
+
+    for (int i = 0; i < N; i += 2) {
         t.erase(to_string(i));
     }
+
     EXPECT_TRUE(t.find("9999") != nullptr);
     EXPECT_TRUE(t.find("0") == nullptr);
 }
@@ -601,4 +608,132 @@ TEST(hash, iterator) {
     EXPECT_TRUE(find(keys.begin(), keys.end(), "apple") != keys.end());
     EXPECT_TRUE(find(keys.begin(), keys.end(), "cherry") != keys.end());
     EXPECT_TRUE(find(keys.begin(), keys.end(), "apricot") != keys.end());
+}
+
+
+
+
+
+
+
+
+TEST(hash_chain, empty_) {
+    hash_table t;
+    EXPECT_TRUE(t.empty());
+    EXPECT_EQ(t.size(), 0);
+    EXPECT_TRUE(t.begin() == t.end());
+}
+
+TEST(hash_chain, insert_) {
+    hash_table t;
+    ASSERT_NO_THROW(t.insert("a", polinom("x+2")));
+    EXPECT_FALSE(t.empty());
+    EXPECT_EQ(t.size(), 1);
+    EXPECT_TRUE(t.find("a") != t.end());
+    EXPECT_TRUE(t.find("b") == t.end());
+}
+
+TEST(hash_chain, insert_many) {
+    hash_table t;
+    t.insert("b", polinom("x"));
+    t.insert("a", polinom("2x^3+1"));
+    t.insert("c", polinom("4x^9"));
+
+    EXPECT_EQ(t.size(), 3);
+    EXPECT_TRUE(t.find("a") != t.end());
+    EXPECT_TRUE(t.find("b") != t.end());
+    EXPECT_TRUE(t.find("c") != t.end());
+}
+
+TEST(hash_chain, insert_duplicate) {
+    hash_table t;
+    t.insert("k", polinom("x+2"));
+
+    auto it = t.insert("k", polinom("2x^3+1"));
+    EXPECT_TRUE(it == t.end());
+    EXPECT_EQ(t.size(), 1);
+
+    auto p = t.find("k");
+    ASSERT_TRUE(p != t.end());
+    EXPECT_EQ(p->second, polinom("x+2"));
+}
+
+TEST(hash_chain, erase_) {
+    hash_table t;
+    t.insert("a", polinom("x"));
+    t.insert("b", polinom("x+2"));
+    t.insert("c", polinom("2x^3+1"));
+
+    t.erase("b");
+
+    EXPECT_EQ(t.size(), 2);
+    EXPECT_TRUE(t.find("b") == t.end());
+    EXPECT_TRUE(t.find("a") != t.end());
+    EXPECT_TRUE(t.find("c") != t.end());
+}
+
+TEST(hash_chain, erase_2) {
+    hash_table t;
+    t.insert("a", polinom("x"));
+    t.insert("b", polinom("x+2"));
+
+    auto it = t.erase("nope");
+    EXPECT_TRUE(it == t.end());
+    EXPECT_EQ(t.size(), 2);
+    EXPECT_TRUE(t.find("a") != t.end());
+    EXPECT_TRUE(t.find("b") != t.end());
+}
+
+TEST(hash_chain, clear_) {
+    hash_table t;
+    t.insert("a", polinom("x"));
+    t.insert("b", polinom("x+2"));
+
+    t.clear();
+
+    EXPECT_TRUE(t.empty());
+    EXPECT_EQ(t.size(), 0);
+    EXPECT_TRUE(t.begin() == t.end());
+}
+
+TEST(hash_chain, stress) {
+    hash_table t;
+    const int N = 100000;
+
+    for (int i = 0; i < N; i++) {
+        t.insert(std::to_string(i), polinom("x"));
+    }
+
+    EXPECT_TRUE(t.find("9999") != t.end());
+
+    for (int i = 0; i < N; i += 2) {
+        t.erase(std::to_string(i));
+    }
+
+    EXPECT_TRUE(t.find("9999") != t.end());
+    EXPECT_TRUE(t.find("0") == t.end());
+}
+
+TEST(hash_chain, iterator_empty) {
+    hash_table t;
+    EXPECT_TRUE(t.begin() == t.end());
+}
+
+TEST(hash_chain, iterator) {
+    hash_table t;
+    t.insert("banana", polinom("1"));
+    t.insert("apple", polinom("2"));
+    t.insert("cherry", polinom("3"));
+    t.insert("apricot", polinom("4"));
+
+    std::vector<std::string> keys;
+    for (auto it = t.begin(); it != t.end(); ++it) {
+        keys.push_back((*it).first);
+    }
+
+    EXPECT_EQ(keys.size(), 4);
+    EXPECT_TRUE(std::find(keys.begin(), keys.end(), "banana") != keys.end());
+    EXPECT_TRUE(std::find(keys.begin(), keys.end(), "apple") != keys.end());
+    EXPECT_TRUE(std::find(keys.begin(), keys.end(), "cherry") != keys.end());
+    EXPECT_TRUE(std::find(keys.begin(), keys.end(), "apricot") != keys.end());
 }
