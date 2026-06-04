@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include <string>
-#include <polynom.h>   
+#include "polynom.h"  
 
 using namespace std;
 
