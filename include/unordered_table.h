@@ -1,5 +1,5 @@
 #pragma once
-#include <polynom.h>
+#include "polynom.h"
 #include <iostream>
 #include <vector>
 

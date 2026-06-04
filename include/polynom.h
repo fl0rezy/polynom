@@ -3,6 +3,8 @@
 #include <string>
 #include <forward_list>
 #include <vector>
+#include <sstream>
+#include <iomanip>
 
 struct monom {
 	int degree = 0;
@@ -295,6 +297,10 @@ public:
     bool empty() const { return monoms.empty(); }
 
     void clear() { monoms.clear(); }
+
+    polinom(double c) {
+        if (c != 0.0) insertSorted(monom(0, c));
+    }
 
     void print() const {
         if (monoms.empty()) {

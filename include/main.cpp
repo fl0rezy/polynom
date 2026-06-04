@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <cctype>
+#include <cmath>
 #include "TableAdapters.h"
 #include "PolynomFormat.h"
 
@@ -104,12 +106,6 @@ void setActive(TextBox& tb, bool activeState)
     tb.box.setOutlineThickness(activeState ? 2.f : 1.f);
 }
 
-std::string shorten(const std::string& s, std::size_t maxLen)
-{
-    if (s.size() <= maxLen) return s;
-    return s.substr(0, maxLen - 3) + "...";
-}
-
 std::string fitSingleLine(const sf::Font& font, const std::string& s, unsigned int size, float maxWidth)
 {
     sf::Text probe;
@@ -161,6 +157,166 @@ std::vector<std::string> wrapTextLines(const sf::Font& font, const std::string& 
     return lines;
 }
 
+namespace ExprParser {
+
+    enum class TokenType {
+        Number, Variable, Operator, LeftParen, RightParen, End
+    };
+
+    struct Token {
+        TokenType type;
+        std::string value;
+        double numValue;
+        char op;
+    };
+
+    class Lexer {
+        std::string src;
+        size_t pos;
+    public:
+        Lexer(const std::string& s) : src(s), pos(0) {}
+
+        Token next() {
+            skipWhitespace();
+            if (pos >= src.size()) return { TokenType::End, "", 0, 0 };
+
+            char c = src[pos];
+            if (isdigit(c) || c == '.') {
+                std::string num;
+                bool hasDot = false;
+                while (pos < src.size() && (isdigit(src[pos]) || src[pos] == '.')) {
+                    if (src[pos] == '.') {
+                        if (hasDot) throw std::runtime_error("Invalid number");
+                        hasDot = true;
+                    }
+                    num += src[pos++];
+                }
+                double val = std::stod(num);
+                return { TokenType::Number, num, val, 0 };
+            }
+            if (isalpha(c)) {
+                std::string id;
+                while (pos < src.size() && isalnum(src[pos])) {
+                    id += src[pos++];
+                }
+                return { TokenType::Variable, id, 0, 0 };
+            }
+            if (c == '+' || c == '-' || c == '*' || c == '/' || c == '%') {
+                pos++;
+                return { TokenType::Operator, std::string(1, c), 0, c };
+            }
+            if (c == '(') {
+                pos++;
+                return { TokenType::LeftParen, "(", 0, 0 };
+            }
+            if (c == ')') {
+                pos++;
+                return { TokenType::RightParen, ")", 0, 0 };
+            }
+            throw std::runtime_error("Unexpected character");
+        }
+
+    private:
+        void skipWhitespace() {
+            while (pos < src.size() && isspace(src[pos])) pos++;
+        }
+    };
+
+    polinom getPolynomFromName(const std::string& name, ITableAdapter* table) {
+        polinom found;
+        if (table->find(name, found)) {
+            return found;
+        }
+        return polinom(name);
+    }
+
+    static int precedence(char op) {
+        switch (op) {
+        case '+': case '-': return 1;
+        case '*': case '/': case '%': return 2;
+        default: return 0;
+        }
+    }
+
+    polinom applyOp(const polinom& a, char op, const polinom& b) {
+        switch (op) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/': return a / b;
+        case '%': return a % b;
+        default: throw std::runtime_error("Unknown operator");
+        }
+    }
+
+    polinom parseExpression(const std::string& expr, ITableAdapter* table) {
+        Lexer lexer(expr);
+        std::vector<Token> output;
+        std::vector<char> operators;
+
+        auto popOperator = [&]() {
+            char op = operators.back();
+            operators.pop_back();
+            output.push_back({ TokenType::Operator, std::string(1, op), 0, op });
+            };
+
+        while (true) {
+            Token tok = lexer.next();
+            if (tok.type == TokenType::End) break;
+
+            switch (tok.type) {
+            case TokenType::Number:
+            case TokenType::Variable:
+                output.push_back(tok);
+                break;
+            case TokenType::Operator:
+                while (!operators.empty() && operators.back() != '(' &&
+                    precedence(operators.back()) >= precedence(tok.op)) {
+                    popOperator();
+                }
+                operators.push_back(tok.op);
+                break;
+            case TokenType::LeftParen:
+                operators.push_back('(');
+                break;
+            case TokenType::RightParen:
+                while (!operators.empty() && operators.back() != '(') {
+                    popOperator();
+                }
+                if (operators.empty()) throw std::runtime_error("Mismatched parentheses");
+                operators.pop_back();
+                break;
+            default:
+                throw std::runtime_error("Unknown token");
+            }
+        }
+
+        while (!operators.empty()) {
+            if (operators.back() == '(') throw std::runtime_error("Mismatched parentheses");
+            popOperator();
+        }
+
+        std::vector<polinom> evalStack;
+        for (const auto& tok : output) {
+            if (tok.type == TokenType::Number) {
+                evalStack.push_back(polinom(tok.numValue));
+            }
+            else if (tok.type == TokenType::Variable) {
+                evalStack.push_back(getPolynomFromName(tok.value, table));
+            }
+            else if (tok.type == TokenType::Operator) {
+                if (evalStack.size() < 2) throw std::runtime_error("Invalid expression");
+                polinom b = evalStack.back(); evalStack.pop_back();
+                polinom a = evalStack.back(); evalStack.pop_back();
+                evalStack.push_back(applyOp(a, tok.op, b));
+            }
+        }
+        if (evalStack.size() != 1) throw std::runtime_error("Invalid expression");
+        return evalStack.back();
+    }
+}
+
+
 int main()
 {
     sf::RenderWindow window(sf::VideoMode(1400, 900), "Polynomial", sf::Style::Titlebar | sf::Style::Close);
@@ -179,10 +335,16 @@ int main()
     StorageType selectedType = StorageType::OrderedTable;
     std::unique_ptr<ITableAdapter> table = CreateAdapter(selectedType);
 
+
     TextBox keyBox = makeTextBox(font, 24, 110, 300, 42);
     TextBox polyBox = makeTextBox(font, 24, 184, 300, 42);
     TextBox p1Box = makeTextBox(font, 24, 586, 300, 42);
     TextBox p2Box = makeTextBox(font, 24, 660, 300, 42);
+
+
+    TextBox exprBox = makeTextBox(font, 720, 820, 500, 42);
+    TextBox resultKeyBox = makeTextBox(font, 400, 820, 300, 42);
+
 
     Button addBtn = makeButton(font, 24, 248, 145, 42, "Add");
     Button findBtn = makeButton(font, 179, 248, 145, 42, "Find");
@@ -194,6 +356,10 @@ int main()
     Button mulBtn = makeButton(font, 154, 724, 55, 42, "*");
     Button divBtn = makeButton(font, 219, 724, 55, 42, "/");
     Button modBtn = makeButton(font, 284, 724, 40, 42, "%");
+
+
+    Button evalBtn = makeButton(font, 1250, 820, 120, 42, "Evaluate");
+
 
     std::vector<Button> storageButtons;
     float sx = 360.f;
@@ -247,9 +413,13 @@ int main()
             {
                 fn();
             }
+            catch (const std::exception& e)
+            {
+                setStatus(std::string("Error: ") + e.what(), danger);
+            }
             catch (...)
             {
-                setStatus("Operation failed. Check polynomial format or selected structure.", danger);
+                setStatus("Operation failed. Check polynomial format or expression.", danger);
             }
         };
 
@@ -277,6 +447,8 @@ int main()
                 setActive(polyBox, polyBox.contains(mouse));
                 setActive(p1Box, p1Box.contains(mouse));
                 setActive(p2Box, p2Box.contains(mouse));
+                setActive(exprBox, exprBox.contains(mouse));
+                setActive(resultKeyBox, resultKeyBox.contains(mouse));
 
                 for (std::size_t i = 0; i < storageButtons.size(); ++i)
                 {
@@ -293,7 +465,7 @@ int main()
                 {
                     executeSafe([&]()
                         {
-                            if (keyBox.value.empty()) throw 1;
+                            if (keyBox.value.empty()) throw std::runtime_error("Key is empty");
                             polinom p = parsePolynomFromBox(polyBox);
                             bool okInsert = table->insert(keyBox.value, p);
                             setStatus(okInsert ? "Inserted" : "Key already exists", okInsert ? ok : danger);
@@ -375,6 +547,22 @@ int main()
                             setStatus("P1 % P2 = " + polinomToString(res), accent);
                         });
                 }
+
+                if (evalBtn.contains(mouse))
+                {
+                    executeSafe([&]()
+                        {
+                            if (exprBox.value.empty()) throw std::runtime_error("Expression is empty");
+                            if (resultKeyBox.value.empty()) throw std::runtime_error("Result key is empty");
+
+                            polinom result = ExprParser::parseExpression(exprBox.value, table.get());
+                            bool inserted = table->insert(resultKeyBox.value, result);
+                            if (inserted)
+                                setStatus("Computed and saved as " + resultKeyBox.value + " = " + polinomToString(result), ok);
+                            else
+                                setStatus("Key already exists, not saved", danger);
+                        });
+                }
             }
 
             if (event.type == sf::Event::TextEntered)
@@ -384,6 +572,8 @@ int main()
                 else if (polyBox.active) activeBox = &polyBox;
                 else if (p1Box.active) activeBox = &p1Box;
                 else if (p2Box.active) activeBox = &p2Box;
+                else if (exprBox.active) activeBox = &exprBox;
+                else if (resultKeyBox.active) activeBox = &resultKeyBox;
 
                 if (activeBox)
                 {
@@ -395,6 +585,7 @@ int main()
                     }
                     else if (ch == 13)
                     {
+
                     }
                     else if (ch >= 32 && ch < 127)
                     {
@@ -450,6 +641,8 @@ int main()
         polyBox.draw(window);
         p1Box.draw(window);
         p2Box.draw(window);
+        exprBox.draw(window);
+        resultKeyBox.draw(window);
 
         addBtn.draw(window);
         findBtn.draw(window);
@@ -460,6 +653,7 @@ int main()
         mulBtn.draw(window);
         divBtn.draw(window);
         modBtn.draw(window);
+        evalBtn.draw(window);
 
         for (const auto& btn : storageButtons) btn.draw(window);
 
@@ -511,7 +705,6 @@ int main()
             rowLine.setFillColor(sf::Color(238, 241, 246));
             window.draw(rowLine);
         }
-
 
         window.display();
     }
